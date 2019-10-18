@@ -118,12 +118,17 @@ int execute_command(char* command)
 		if (run_concurrently)
 			printf("\nJob '%s' is executing\n", command);
 
-		execvp(args[0], args);
+		int result = execvp(args[0], args);
+		exit(EXIT_FAILURE);
 	}	
 	else
 	{
 		if (!run_concurrently)
+		{
 			waitpid(pid, &status, WUNTRACED);
+			if (status != EXIT_SUCCESS)
+				printf("command not found: %s\n", args[0]);
+		}
 	}
 
 	return 1;
