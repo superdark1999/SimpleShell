@@ -71,31 +71,41 @@ int execute_command(char* command)
 	char *args[MAX_ARGC];
 	int argc = split_string(command, args, " ");
 
-	int i;
-	int fd[2] = { -1, -1 };
+	int less_than_symbol = contains(args, "<");
+	int greater_than_symbol = contains(args, ">");
+	int input_file = -1;
+	int output_file = -1;
 
-	if ((i = contains(args, "<")) != -1)
-	{
-		fd[0] = open(args[i + 1], O_RDONLY);
-		args[i] = NULL;
-	}
-	else if ((i = contains(args, ">")) != -1)
-	{
-		fd[1] = open(args[i + 1], O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IRGRP | S_IWGRP | S_IWUSR);
-		args[i] = NULL;
-	}
+	if (less_than_symbol != -1)
+		input_file = open(args[less_than_symbol + 1], O_RDONLY);
 
+	if (greater_than_symbol != -1)
+		output_file = open(args[greater_than_symbol + 1], O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IRGRP | S_IWGRP | S_IWUSR);
+
+	if (less_than_symbol != -1 && greater_than_symbol == -1)
+		args[less_than_symbol] = NULL;
+	else if (less_than_symbol == -1 && greater_than_symbol != -1)
+		args[greater_than_symbol] = NULL;
+	else if (less_than_symbol != -1 && greater_than_symbol != -1)
+	{
+		int min = less_than_symbol;
+		if (greater_than_symbol < less_than_symbol)
+			min = greater_than_symbol;
+		args[min] = NULL;
+	}
+		
 
 	__pid_t pid = fork();
 	int status;
 
 	if (pid == 0)
 	{
-		dup2(fd[0], STDIN_FILENO);
-		dup2(fd[1], STDOUT_FILENO);
+		dup2(input_file, STDIN_FILENO);
+		dup2(output_file, STDOUT_FILENO);
+		close(input_file);
+		close(output_file);
+		
 		execvp(args[0], args);
-		close(fd[0]);
-		close(fd[1]);
 	}	
 	else
 	{
