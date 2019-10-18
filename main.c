@@ -3,6 +3,7 @@
 #include <sys/wait.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <time.h>
 #include "string_utils.h"
 
 
@@ -71,6 +72,15 @@ int execute_command(char* command)
 	char *args[MAX_ARGC];
 	int argc = split_string(command, args, " ");
 
+	//	Check if command must be run concurrently
+	int run_concurrently = 0;
+	if (strcmp(args[argc - 1], "&") == 0)
+	{
+		run_concurrently = 1;
+		args[argc - 1] = NULL;
+	}
+
+	//	 Redirection
 	int less_than_symbol = contains(args, "<");
 	int greater_than_symbol = contains(args, ">");
 	int input_file = -1;
@@ -93,8 +103,8 @@ int execute_command(char* command)
 			min = greater_than_symbol;
 		args[min] = NULL;
 	}
-		
 
+	//	Create child process and execute command
 	__pid_t pid = fork();
 	int status;
 
@@ -104,12 +114,16 @@ int execute_command(char* command)
 		dup2(output_file, STDOUT_FILENO);
 		close(input_file);
 		close(output_file);
-		
+
+		if (run_concurrently)
+			printf("\nJob '%s' is executing\n", command);
+
 		execvp(args[0], args);
 	}	
 	else
 	{
-		waitpid(pid, &status, WUNTRACED);
+		if (!run_concurrently)
+			waitpid(pid, &status, WUNTRACED);
 	}
 
 	return 1;
