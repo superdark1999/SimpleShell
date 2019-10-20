@@ -12,10 +12,19 @@
 #define BUFFER_SIZE 1024
 
 
-
+/**
+ * Execute a standard command, support redirection and running concurrently
+ * @param {char*} command - the command need to execute
+ * @returns {int} 1 is execute successfully, otherwise 0
+ */
 int execute_command(char* command);
-int execute_pipe_command(char* command);
 
+/**
+ * Execute a pipe command, support running concurrently
+ * @param {char*} command - the pipe command need to execute
+ * @returns {int} 1 is execute successfully, otherwise 0
+ */
+int execute_pipe_command(char* command);
 
 
 int main()
@@ -80,18 +89,21 @@ int execute_command(char* command)
 		args[argc - 1] = NULL;
 	}
 
-	//	 Redirection
+	//	Check redirection
 	int less_than_symbol = contains(args, "<");
 	int greater_than_symbol = contains(args, ">");
 	int input_file = -1;
 	int output_file = -1;
 
+	//	Open input file if found "<"
 	if (less_than_symbol != -1)
 		input_file = open(args[less_than_symbol + 1], O_RDONLY);
 
+	//	Open output file if found "<"
 	if (greater_than_symbol != -1)
 		output_file = open(args[greater_than_symbol + 1], O_WRONLY | O_TRUNC | O_CREAT, S_IRUSR | S_IRGRP | S_IWGRP | S_IWUSR);
 
+	//	Cut out the unnescessary redirection part
 	if (less_than_symbol != -1 && greater_than_symbol == -1)
 		args[less_than_symbol] = NULL;
 	else if (less_than_symbol == -1 && greater_than_symbol != -1)
@@ -121,14 +133,22 @@ int execute_command(char* command)
 		int result = execvp(args[0], args);
 		exit(EXIT_FAILURE);
 	}	
-	else
+	else if (pid != -1)
 	{
 		if (!run_concurrently)
 		{
 			waitpid(pid, &status, WUNTRACED);
 			if (status != EXIT_SUCCESS)
+			{
 				printf("command not found: %s\n", args[0]);
+				return 0;
+			}
 		}
+	}
+	else
+	{
+		printf("Fork error!\n");
+		return 0;
 	}
 
 	return 1;
@@ -140,7 +160,15 @@ int execute_pipe_command(char* command)
 {
 	char *child_command[MAX_PIPE];
 	char *args[MAX_ARGC];
-	
+
+	//	Check if command must be run concurrently
+	int run_concurrently = 0;
+	if (strchr(command, '&') != NULL)
+	{
+		run_concurrently = 1;
+		*strchr(command, '&') = '\0';
+	}
+
 	int n_child = split_string(command, child_command, "|");
 
 	__pid_t pid = fork();
@@ -151,7 +179,11 @@ int execute_pipe_command(char* command)
 		int fd[2];
 		pipe(fd);
 
-		if (fork() == 0)
+		if (run_concurrently)
+			printf("\nJob '%s' is executing\n", command);
+
+		__pid_t child_pid = fork();
+		if (child_pid == 0)
 		{
 			split_string(child_command[0], args, " ");
 
@@ -163,7 +195,7 @@ int execute_pipe_command(char* command)
 			execvp(args[0], args);
 			exit(EXIT_SUCCESS);
 		}
-		else
+		else if (child_pid != -1)
 		{
 			split_string(child_command[1], args, " ");
 
@@ -175,11 +207,24 @@ int execute_pipe_command(char* command)
 
 			execvp(args[0], args);
 		}
+		else
+		{
+			printf("Fork error!!\n");
+		}
+		
 	}	
+	else if (pid != -1)
+	{	
+		if (!run_concurrently)
+		{
+			waitpid(pid, &status, WUNTRACED);
+		}
+	}
 	else
 	{
-		waitpid(pid, &status, WUNTRACED);
+		printf("Fork error!!\n");
 	}
+	
 
 	return 1;
 }

@@ -1,13 +1,13 @@
 #include "string_utils.h"
 
 
-void read_line(char* str)
+int read_line(char* str)
 {
 	int i = 0;
 	int c;
 
 	if (str == NULL)
-		return;
+		return -1;
 
 	while (1)
 	{
@@ -15,7 +15,7 @@ void read_line(char* str)
 		if (c == EOF || c == '\n')
 		{
 			str[i] = '\0';
-			return;
+			return i;
 		}
 		else
 			str[i] = c;
@@ -25,35 +25,28 @@ void read_line(char* str)
 }
 
 
-void print(char** str_arr, int n)
+int split_string(char* str, char* tokens[], const char* delim)
 {
-	for (int i = 0; i < n; i++)
-		printf("    \"%s\"\n", str_arr[i]);
-}
-
-
-int split_string(char* command, char* args[], const char* delim)
-{
-	char* tok = strtok(strdup(command), delim);
+	char* tok = strtok(strdup(str), delim);
 	
 	int n = 0;
 
 	if (tok == NULL)
 	{
-		args[0] = command;
+		tokens[0] = str;
 		n = 1;
 	}
 	else
 	{
 		while (tok != NULL)
 		{
-			args[n] = tok;
+			tokens[n] = tok;
 			n++;
 			tok = strtok(NULL, delim);
 		}
 	}
 	
-	args[n] = NULL;
+	tokens[n] = NULL;
 
 	return n;
 }
